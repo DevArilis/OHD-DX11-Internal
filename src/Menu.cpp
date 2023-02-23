@@ -95,7 +95,6 @@ namespace DX11_Base {
             ImGui::Checkbox("Enable Shots Per Burst", &ShotsPerBurstHack);
 			ImGui::SameLine();
             ImGui::SliderInt("Shots Per Burst", &ShotsPerBurstValue, 3, 250, "%1.0f");
-			ImGui::Checkbox("Enable Friendly Fire", &FriendlyFire);
 			ImGui::Spacing();
 			ImGui::Separator();
 			ImGui::Spacing();
