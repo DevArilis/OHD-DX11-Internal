@@ -1,6 +1,7 @@
 #include "../pch.h"
 #include "../include/Menu.hpp"
 #include <shellapi.h>
+#include <string>;
 
 
 namespace DX11_Base {
@@ -23,9 +24,18 @@ namespace DX11_Base {
 	bool FOVChanger = false;
 	float FOVValue = 0.0f;
 	bool NukeTeam = false;
-	bool NukerRandomOffset = false;
 	bool NukerRandomOffsetY = false;
-	float NukerRandomOffsetValue = 0.0f;
+	bool NukerVToggle = false;
+	bool NukerAuto = false;
+
+	bool esp = false;
+	bool espSnapLines = false;
+	bool espShowTeam = false;
+	bool espBoxes = false;
+	bool espNames = false;
+	bool espTeamColor = false;
+	ImVec2 snaplinesy = ImVec2(960, 0);
+	
 
 	ImVec4 rgb2rgbf(float r, float g, float b) {
 		r = r / 255;
@@ -83,8 +93,77 @@ namespace DX11_Base {
             }
         }
 	}
+	void wait(int seconds)
+	{
+		clock_t endwait;
+		endwait = clock() + seconds * CLOCKS_PER_SEC;
+		while (clock() < endwait) { NULL; };
+	}
 
 
+	int Ticks = 0;
+	void Nuker() {
+		CG::UWorld** p_uworld = reinterpret_cast<CG::UWorld**>(CG::UWorld::GWorld);
+		Nullcheck(p_uworld);
+		Nullcheck(*p_uworld);
+		CG::UGameInstance* OwningGameInstance = (*p_uworld)->OwningGameInstance;
+		Nullcheck(OwningGameInstance);
+		auto GameState = (*p_uworld)->GameState;
+		Nullcheck(GameState);
+		CG::UWorld* gworld = CG::UWorld::GWorld[0];
+		Nullcheck(gworld);
+		CG::ULocalPlayer* localplayer = gworld->OwningGameInstance->LocalPlayers[0];
+		Nullcheck(localplayer);
+
+		auto pArray = GameState->PlayerArray;
+		if (Ticks > 10000) {
+			Ticks = 0;
+		}
+		else {
+			Ticks++;
+			if (pArray.Count() > 1 && Ticks % 2 == 0) {
+				for (USHORT i = 0; i < pArray.Count(); i++) {
+					auto& ent = pArray[i];
+					if (ent != localplayer->PlayerController->PlayerState) {
+						auto Character = static_cast<CG::AHDPlayerCharacter*>(ent->PawnPrivate);
+						Nullcheck(Character);
+						auto Location = Character->ReplicatedMovement.Location;
+						CG::AHDPlayerCharacter* SelfPlayer = static_cast<CG::AHDPlayerCharacter*>(localplayer->PlayerController->AcknowledgedPawn);
+						Nullcheck(SelfPlayer);
+						auto BaseWeapon = reinterpret_cast<CG::AHDBaseWeapon*>(SelfPlayer->EquippedItem);
+						Nullcheck(BaseWeapon);
+						
+						if (NukeTeam) {
+							Nullcheck(BaseWeapon);
+							if (NukerRandomOffsetY) {
+								Location.Z = -100000.0f;
+								Nullcheck(BaseWeapon);
+								BaseWeapon->ServerFireProjectile(Location, {});
+							}
+							else {
+								Nullcheck(BaseWeapon);
+								BaseWeapon->ServerFireProjectile(Location, {});
+							}
+						}
+						else {
+							if (Character->TeamNum != SelfPlayer->TeamNum) {
+								Nullcheck(BaseWeapon);
+								if (NukerRandomOffsetY) {
+									Location.Z = -100000.0f;
+									Nullcheck(BaseWeapon);
+									BaseWeapon->ServerFireProjectile(Location, {});
+								}
+								else {
+									Nullcheck(BaseWeapon);
+									BaseWeapon->ServerFireProjectile(Location, {});
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 	namespace Tabs {
         void TABWeaponCheeze()
         {
@@ -95,20 +174,18 @@ namespace DX11_Base {
             ImGui::Checkbox("Enable Shots Per Burst", &ShotsPerBurstHack);
 			ImGui::SameLine();
             ImGui::SliderInt("Shots Per Burst", &ShotsPerBurstValue, 3, 250, "%1.0f");
-			ImGui::Checkbox("Enable Friendly Fire", &FriendlyFire);
 			ImGui::Spacing();
 			ImGui::Separator();
 			ImGui::Spacing();
 			ImGui::Checkbox("Nuker Targets Team", &NukeTeam);
 			ImGui::SameLine();
-			ImGui::Checkbox("Nuker Offsetter", &NukerRandomOffset);
-			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip("This will randomly select a range between 0 and the offset slider value.");
-			ImGui::SameLine();
 			ImGui::Checkbox("Smoke Rain", &NukerRandomOffsetY);
 			if (ImGui::IsItemHovered())
 				ImGui::SetTooltip("Enable Offsetter with this, hold a smoke, and press nuke!");
-			ImGui::SliderFloat("Nuker Offset", &NukerRandomOffsetValue, 0.0f, 200.0f, "%1.0f");
+			ImGui::SameLine();
+			ImGui::Checkbox("Auto-Nuke", &NukerAuto);
+			ImGui::SameLine();
+			ImGui::Checkbox("Nuke on V", &NukerVToggle);
 			if (ImGui::Button("Projectile Nuker", ImVec2(ImGui::GetWindowContentRegionWidth() - 3, 20))) {
 				CG::UWorld** p_uworld = reinterpret_cast<CG::UWorld**>(CG::UWorld::GWorld);
 				Nullcheck(p_uworld);
@@ -117,7 +194,7 @@ namespace DX11_Base {
 				Nullcheck(OwningGameInstance);
 				auto GameState = (*p_uworld)->GameState;
 				Nullcheck(GameState);
-				CG::UWorld* gworld = CG::UWorld::GWorld[0];
+				CG::UWorld* gworld = CG::UWorld::GWorld[0]; 
 				Nullcheck(gworld);
 				CG::ULocalPlayer* localplayer = gworld->OwningGameInstance->LocalPlayers[0];
 				Nullcheck(localplayer);
@@ -136,19 +213,10 @@ namespace DX11_Base {
 							Nullcheck(SelfPlayer);
 							if (NukeTeam) {
 								Nullcheck(BaseWeapon);
-								if (NukerRandomOffset) {
-									if (NukerRandomOffsetY) {
-										Location.Z = -100000.0f;
-										Nullcheck(BaseWeapon);
-										BaseWeapon->ServerFireProjectile(Location, {});
-									}
-									else {
-										Location.X = RandomFloat(0.0f, NukerRandomOffsetValue);
-										Location.Y = RandomFloat(0.0f, NukerRandomOffsetValue);;
-										Location.Z = RandomFloat(0.0f, NukerRandomOffsetValue);;
-										Nullcheck(BaseWeapon);
-										BaseWeapon->ServerFireProjectile(Location, {});
-									}
+								if (NukerRandomOffsetY) {
+									Location.Z = -100000.0f;
+									Nullcheck(BaseWeapon);
+									BaseWeapon->ServerFireProjectile(Location, {});
 								}
 								else {
 									Nullcheck(BaseWeapon);
@@ -158,25 +226,16 @@ namespace DX11_Base {
 							}
 							else {
 								if (Character->TeamNum != SelfPlayer->TeamNum) {
-									if (NukerRandomOffset) {
-										CG::FVector_NetQuantizeNormal origin;
-										if (NukerRandomOffsetY) {
-											Location.Z = -100000.0f;
-											Nullcheck(BaseWeapon);
-											BaseWeapon->ServerFireProjectile(Location, {});
-										}
-										else {
-											Location.X = RandomFloat(0.0f, NukerRandomOffsetValue);;
-											Location.Y = RandomFloat(0.0f, NukerRandomOffsetValue);;
-											Location.Z = RandomFloat(0.0f, NukerRandomOffsetValue);;
-											Nullcheck(BaseWeapon);
-											BaseWeapon->ServerFireProjectile(Location, {});
-										}
+									Nullcheck(BaseWeapon);
+									if (NukerRandomOffsetY) {
+										Location.Z = -100000.0f;
+										Nullcheck(BaseWeapon);
+										BaseWeapon->ServerFireProjectile(Location, {});
 									}
 									else {
 										Nullcheck(BaseWeapon);
 										BaseWeapon->ServerFireProjectile(Location, {});
-									}
+									}	
 								}
 							}
 						}
@@ -188,7 +247,22 @@ namespace DX11_Base {
             ImGui::Spacing();
 			ImGui::Text("Press INSERT to open/close the menu.");
         };
+		void TABESP() {
+			ImGui::TextColored(ImVec4(255, 0, 0, 1), "This is an experimental feature, expect bugs.");
+			ImGui::Checkbox("ESP Enabled", &esp);
+			ImGui::SameLine();
+			ImGui::Checkbox("Show Team", &espShowTeam);
+			ImGui::Checkbox("Boxes", &espBoxes);
+			ImGui::SameLine();
+			ImGui::Checkbox("Names", &espNames);
+			ImGui::SameLine();
+			ImGui::Checkbox("Snaplines", &espSnapLines);
+			ImGuiIO& io = ImGui::GetIO();
+			ImGui::SliderFloat("Snaplines Y", &snaplinesy.y, 0, io.DisplaySize.y, "%1.0f");
+			ImGui::Checkbox("Team Colors", &espTeamColor);
+		};
 		void TABMisc() {
+			
 			ImGui::Checkbox("Fly", &Flyhack);
 			ImGui::Checkbox("Noclip", &Noclip);
 			ImGui::Checkbox("Desync", &Desync);
@@ -212,8 +286,7 @@ namespace DX11_Base {
 #endif
 				g_KillSwitch = TRUE;
 			}
-		};
-		
+		};		
 		void TABCredits() {
 			ImGui::Text("ArilisDev - For the cheat in and of itself.");
 			ImGui::Text("NightFyre - DX11 Base.");
@@ -222,9 +295,20 @@ namespace DX11_Base {
 			}
 		}
 	}
-
+	
 	void Menu::Draw()
 	{
+
+		const ImGuiWindowFlags windowFlags{ ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBackground };
+		//  I like to use tabs to display my content in an organized manner, Here is an example on how you could do the same
+		//  As a courtesy I have left the TABS namespace with an Example Tab
+		ImGui::SetNextWindowPos(ImVec2(1, 1));
+		ImGui::Begin("watermark", nullptr, windowFlags);
+		{
+			ImGui::TextColored(rgb2rgbf(252, 232, 3), "[OHD Internal V3]\nMenu Key: INSERT\nBy ArilisDev");
+			
+		}
+		ImGui::End();
 		if (g_GameVariables->m_ShowMenu)
 			MainMenu();
 
@@ -234,6 +318,137 @@ namespace DX11_Base {
 		if (g_GameVariables->m_ShowDemo)
 			ImGui::ShowDemoWindow();
 
+		if (esp) {
+			CG::UWorld** p_uworld = reinterpret_cast<CG::UWorld**>(CG::UWorld::GWorld);
+			Nullcheck(p_uworld);
+			Nullcheck(*p_uworld);
+			CG::UGameInstance* OwningGameInstance = (*p_uworld)->OwningGameInstance;
+			Nullcheck(OwningGameInstance);
+			auto GameState = (*p_uworld)->GameState;
+			Nullcheck(GameState);
+			CG::UWorld* gworld = CG::UWorld::GWorld[0];
+			Nullcheck(gworld);
+			CG::ULocalPlayer* localplayer = gworld->OwningGameInstance->LocalPlayers[0];
+			Nullcheck(localplayer);
+			Nullcheck(localplayer->PlayerController);
+			Nullcheck(localplayer->PlayerController->AcknowledgedPawn);
+			CG::AHDPlayerCharacter* SelfPlayer = static_cast<CG::AHDPlayerCharacter*>(localplayer->PlayerController->AcknowledgedPawn);
+			Nullcheck(SelfPlayer);
+			auto pArray = GameState->PlayerArray;
+			if (pArray.Count() > 1) {
+				for (USHORT i = 0; i < pArray.Count(); i++) {
+					auto& ent = pArray[i];
+					if (ent != localplayer->PlayerController->PlayerState) {
+						localplayer->PlayerController->PlayerState->GetPlayerName();
+						auto Character2 = static_cast<CG::AHDPlayerCharacter*>(ent->PawnPrivate);
+						Nullcheck(Character2);
+						Nullcheck(SelfPlayer);
+						if (ent->PawnPrivate == nullptr) return;
+						if (ent->PawnPrivate == nullptr) return;
+						if (Character2->Health <= 0) return;
+						if (espShowTeam) {
+							auto Location = Character2->ReplicatedMovement.Location;
+							CG::FVector2D screen;
+							localplayer->PlayerController->ProjectWorldLocationToScreen(Location, &screen, NULL);
+							auto draw = ImGui::GetBackgroundDrawList();
+							if (espTeamColor) {
+								if (Character2->TeamNum != SelfPlayer->TeamNum) {
+									if (espSnapLines) {
+										draw->AddLine(ImVec2(960, snaplinesy.y), ImVec2(screen.X, screen.Y - 10), ImColor(255, 0, 0), 1);
+									}
+
+									auto name = Character2->PlayerState->GetPlayerName().ToString();
+									if (espNames) {
+										int label_size = ImGui::CalcTextSize(name.c_str(), NULL, true).x;
+
+										draw->AddText(ImVec2((float)screen.X - label_size / 2, screen.Y - 16), ImColor(255, 0, 0), name.c_str());
+									}
+
+									if (espBoxes) {
+										draw->AddRect({ (float)screen.X - 10 / 2 - 1, screen.Y - 5 }, { (float)screen.X + 10 / 2 + 3 , screen.Y + 10}, ImColor(255, 0, 0));
+									}
+								}
+								else {
+									if (espSnapLines) {
+										draw->AddLine(ImVec2(960, snaplinesy.y), ImVec2(screen.X, screen.Y - 10), ImColor(0, 255, 0), 1);
+									}
+
+									auto name = Character2->PlayerState->GetPlayerName().ToString();
+									if (espNames) {
+										int label_size = ImGui::CalcTextSize(name.c_str(), NULL, true).x;
+										draw->AddText(ImVec2((float)screen.X - label_size / 2, screen.Y - 16), ImColor(0, 255, 0), name.c_str());
+									}
+
+									if (espBoxes) {
+										draw->AddRect({ (float)screen.X - 10 / 2 - 1, screen.Y - 5 }, { (float)screen.X + 10 / 2 + 3 , screen.Y + 10}, ImColor(0, 255, 0));
+									}
+								}
+
+							}
+							else {
+								if (espSnapLines) {
+									draw->AddLine(ImVec2(960, snaplinesy.y), ImVec2(screen.X, screen.Y - 10), ImColor(165, 94, 234), 1);
+								}
+
+								auto name = Character2->PlayerState->GetPlayerName().ToString();
+								if (espNames) {
+									int label_size = ImGui::CalcTextSize(name.c_str(), NULL, true).x;
+									draw->AddText(ImVec2((float)screen.X - label_size / 2, screen.Y - 16), ImColor(165, 94, 234), name.c_str());
+								}
+
+								if (espBoxes) {
+									draw->AddRect({ (float)screen.X - 10 / 2 - 1, screen.Y - 5 }, { (float)screen.X + 10 / 2 + 3 , screen.Y + 10}, ImColor(165, 94, 234));
+								}
+							}
+							
+						}
+						else {
+
+							if (Character2->TeamNum != SelfPlayer->TeamNum) {
+								auto Location = Character2->ReplicatedMovement.Location;
+								CG::FVector2D screen;
+								localplayer->PlayerController->ProjectWorldLocationToScreen(Location, &screen, NULL);
+								auto draw = ImGui::GetBackgroundDrawList();
+								if (espTeamColor) {
+									if (espSnapLines) {
+										draw->AddLine(ImVec2(960, snaplinesy.y), ImVec2(screen.X, screen.Y - 10), ImColor(255, 0, 0), 1);
+									}
+
+									auto name = Character2->PlayerState->GetPlayerName().ToString();
+									if (espNames) {
+										int label_size = ImGui::CalcTextSize(name.c_str(), NULL, true).x;
+
+										draw->AddText(ImVec2((float)screen.X - label_size / 2, screen.Y - 16), ImColor(255, 0, 0), name.c_str());
+									}
+
+									if (espBoxes) {
+										draw->AddRect({ (float)screen.X - 10 / 2 - 1, screen.Y - 5 }, { (float)screen.X + 10 / 2 + 3 , screen.Y + 10}, ImColor(255, 0, 0));
+									}
+
+								}
+								else {
+									if (espSnapLines) {
+										draw->AddLine(ImVec2(960, snaplinesy.y), ImVec2(screen.X, screen.Y - 10), ImColor(165, 94, 234), 1);
+									}
+									Nullcheck(Character2);
+									Nullcheck(Character2->PlayerState);
+									auto name = Character2->PlayerState->GetPlayerName().ToString();
+									if (espNames) {
+										int label_size = ImGui::CalcTextSize(name.c_str(), NULL, true).x;
+										draw->AddText(ImVec2((float)screen.X - label_size / 2, screen.Y - 16), ImColor(165, 94, 234), name.c_str());
+									}
+
+									if (espBoxes) {
+										draw->AddRect({ (float)screen.X - 10 / 2 - 1, screen.Y - 5 }, { (float)screen.X + 10 / 2 + 3 , screen.Y + 10}, ImColor(165, 94, 234));
+									}
+								}
+							}
+						}
+
+					}
+				}
+			}
+		}
 		
 		
 	}
@@ -249,6 +464,7 @@ namespace DX11_Base {
             ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(g_Menu->dbg_RAINBOW));
             ImGui::PushStyleColor(ImGuiCol_BorderShadow, ImVec4(g_Menu->dbg_RAINBOW));
         }
+		
 		ImGuiIO& io = ImGui::GetIO();
 		ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
         if (!ImGui::Begin("Opertation: Harsh Doorstop Internal", &g_GameVariables->m_ShowMenu, 96))
@@ -264,9 +480,7 @@ namespace DX11_Base {
         
         //  Display Menu Content
         //Tabs::TABMain();
-
-        //  I like to use tabs to display my content in an organized manner, Here is an example on how you could do the same
-        //  As a courtesy I have left the TABS namespace with an Example Tab
+		
         if (ImGui::BeginTabBar("##tabs", ImGuiTabBarFlags_None))
         {
             if (ImGui::BeginTabItem("Weapon"))
@@ -274,6 +488,11 @@ namespace DX11_Base {
                 Tabs::TABWeaponCheeze();
                 ImGui::EndTabItem();
             }
+			if (ImGui::BeginTabItem("ESP"))
+			{
+				Tabs::TABESP();
+				ImGui::EndTabItem();
+			}
 			if (ImGui::BeginTabItem("Miscellaneous"))
 			{
 				Tabs::TABMisc();
@@ -293,6 +512,38 @@ namespace DX11_Base {
 	void Menu::HUD(bool* p_open)
 	{
 
+	}
+	CG::FVector2D CalcAngle(const CG::FVector& src, const CG::FVector& dst, const CG::FVector currentAngles, float smoothness);
+
+	#define UCONST_Pi 3.1415926
+	#define URotation180 32768
+	#define URotationToRadians  UCONST_Pi / URotation180 
+	
+	CG::FVector RotationToVector(CG::FRotator R)
+	{
+		CG::FVector Vec;
+		float fYaw = R.Yaw * URotationToRadians;
+		float fPitch = R.Pitch * URotationToRadians;
+		float CosPitch = cos(fPitch);
+		Vec.X = cos(fYaw) * CosPitch;
+		Vec.Y = sin(fYaw) * CosPitch;
+		Vec.Z = sin(fPitch);
+
+		return Vec;
+	}
+	CG::FRotator VecToRot(CG::FVector2D InVec)
+	{
+		CG::FRotator Result;
+		float direction = atan2(InVec.Y, InVec.X);
+		float magnitude = sqrt(InVec.X * InVec.X + InVec.Y * InVec.Y);
+
+		int yaw = magnitude * cos(direction);
+		int pitch = magnitude * sin(direction);
+
+		Result.Pitch = pitch;
+		Result.Yaw = yaw;
+		Result.Roll = 0;
+		return Result;
 	}
 	
 	void Menu::Loops()
@@ -322,14 +573,12 @@ namespace DX11_Base {
 		Nullcheck(Gamemode);
 		Vector3 GetVectorForward(const Vector3 & angles);
 		static bool bResetFly = false;
-		if (NukerRandomOffsetY) {
-			NukerRandomOffset = true;
-		}
-
+		
 		if (Flyhack && Desync) {
 			Desync = false;
 		}
-		
+
+
 		if (Flyhack)
 		{
 			Character->SetReplicateMovement(false);
@@ -356,6 +605,16 @@ namespace DX11_Base {
 		}
 		else if (check) {
 			Character->SetReplicateMovement(true);
+		}
+
+		if (NukerVToggle && KP(0x56)) {
+			Nuker();
+			Sleep(2000);
+		}
+
+		if (NukerAuto) {
+			Nuker();
+			Sleep(2000);
 		}
 
 		if (Speedhack) {

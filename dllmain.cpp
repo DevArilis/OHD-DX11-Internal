@@ -6,6 +6,7 @@
 #include "libs/SDK/CoreUObject_Package.cpp"
 #include "libs/SDK/Engine_Package.cpp"
 #include "libs/SDK/DonkehFramework_Package.cpp"
+#include <detours.h>
 
 extern DWORD WINAPI MainThread_Initialize();
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  dwCallReason, LPVOID lpReserved)
