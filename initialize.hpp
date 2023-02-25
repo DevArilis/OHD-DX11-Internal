@@ -8,7 +8,7 @@
 
 DWORD WINAPI MainThread_Initialize()
 {
-    CG::InitSdk();
+	CG::InitSdk(L"HarshDoorstop-Win64-Shipping.exe", 0x41E4D88, 0x41CC340, 0x4327088);
     using namespace DX11_Base;
     g_Console = std::make_unique<Console>();
 
